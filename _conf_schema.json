@@ -1,0 +1,21 @@
+{
+  "enable_llm": {
+    "description": "启用大模型解释",
+    "type": "bool",
+    "hint": "开启后占卜结果会附带 LLM 解释",
+    "default": false
+  },
+  "llm_max_chars": {
+    "description": "LLM 解释字数上限",
+    "type": "int",
+    "hint": "控制 LLM 生成解释的最长字符数，默认 50",
+    "default": 50
+  },
+  "persona_id": {
+    "description": "占卜人格",
+    "type": "string",
+    "hint": "选择占卜时使用的 AI 人格（LLM 开启时生效）。留空则使用默认人格。",
+    "_special": "select_persona",
+    "default": ""
+  }
+}

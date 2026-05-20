@@ -1,0 +1,6 @@
+name: augury
+display_name: 占卜插件
+desc: 简易占卜插件，支持随机结果与 LLM 解释
+version: 1.1.0
+author: user
+astrbot_version: ">=4.0,<5"
