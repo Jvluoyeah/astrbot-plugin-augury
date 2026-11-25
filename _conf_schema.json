@@ -17,5 +17,17 @@
     "hint": "选择占卜时使用的 AI 人格（LLM 开启时生效）。留空则使用默认人格。",
     "_special": "select_persona",
     "default": ""
+  },
+  "enable_safety_check": {
+    "description": "启用安全限制",
+    "type": "bool",
+    "hint": "开启后将检测占卜内容是否符合正向价值观，不符合则拦截并提示",
+    "default": true
+  },
+  "safety_block_message": {
+    "description": "安全拦截提示语",
+    "type": "string",
+    "hint": "当占卜内容触发安全限制时返回的提示信息",
+    "default": "抱歉，该占卜内容不符合正向价值观或存在安全风险，无法为您占卜。"
   }
 }
