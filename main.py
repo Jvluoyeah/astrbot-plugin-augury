@@ -1,6 +1,13 @@
+import asyncio
 import json
 import random
+import urllib.request
 from datetime import date
+
+try:
+    import aiohttp
+except ImportError:
+    aiohttp = None
 
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star
@@ -8,6 +15,7 @@ from astrbot.api import logger, AstrBotConfig
 
 FORTUNES = ["大吉", "中吉", "小吉", "吉", "末吉", "凶", "大凶"]
 DEFAULT_SAFETY_BLOCK_MESSAGE = "抱歉，该占卜内容不符合正向价值观或存在安全风险，无法为您占卜。"
+DEFAULT_DEEPSEEK_SEARCH_URL = "https://api.deepseek.com/v1/tools/search"
 UNSAFE_KEYWORDS = (
     "自杀", "自残", "轻生", "跳楼", "割腕", "寻死",
     "杀人", "谋杀", "行凶", "伤害他人", "报复", "下毒", "投毒", "纵火",
@@ -55,6 +63,76 @@ class AuguryPlugin(Star):
 
         return True
 
+    async def _search_content_meaning(self, content: str) -> str:
+        """Search web context for the divination content via DeepSeek Search API."""
+        api_key = str(self.config.get("deepseek_api_key") or "").strip()
+        if not api_key:
+            logger.warning("已开启网页搜索，但未配置 deepseek_api_key，跳过搜索。")
+            return ""
+
+        search_url = (
+            str(self.config.get("deepseek_search_url") or "").strip()
+            or DEFAULT_DEEPSEEK_SEARCH_URL
+        )
+        try:
+            count = int(self.config.get("web_search_count", 5) or 5)
+        except (TypeError, ValueError):
+            count = 5
+        count = max(1, min(50, count))
+
+        query = content[:128].strip()
+        if not query:
+            return ""
+
+        payload = {
+            "query": query,
+            "count": count,
+            "need_content": False,
+        }
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            if aiohttp is not None:
+                timeout = aiohttp.ClientTimeout(total=10)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.post(search_url, json=payload, headers=headers) as resp:
+                        if resp.status != 200:
+                            body = await resp.text()
+                            logger.warning(f"DeepSeek 网页搜索返回状态码 {resp.status}: {body[:200]}")
+                            return ""
+                        data = await resp.json()
+            else:
+                def _sync_post():
+                    req = urllib.request.Request(
+                        search_url,
+                        data=json.dumps(payload).encode("utf-8"),
+                        headers=headers,
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(req, timeout=10) as r:
+                        return json.loads(r.read().decode("utf-8"))
+
+                data = await asyncio.to_thread(_sync_post)
+
+            results = data.get("results") or []
+            lines = []
+            for idx, item in enumerate(results, start=1):
+                title = str(item.get("title") or "").strip()
+                snippet = str(item.get("snippet") or item.get("content") or "").strip()
+                if title and snippet:
+                    lines.append(f"{idx}. {title}: {snippet}")
+                elif snippet:
+                    lines.append(f"{idx}. {snippet}")
+                elif title:
+                    lines.append(f"{idx}. {title}")
+            return "\n".join(lines)
+        except Exception as e:
+            logger.warning(f"DeepSeek 网页搜索失败: {e}")
+            return ""
+
     @filter.command("占卜")
     async def augury(self, event: AstrMessageEvent, *, content: str = None):
         content = "" if content is None else str(content).strip()
@@ -96,17 +174,23 @@ class AuguryPlugin(Star):
                             if persona:
                                 system_prompt = persona.system_prompt
 
+                        search_context = ""
+                        if self.config.get("enable_web_search", False):
+                            search_context = await self._search_content_meaning(content)
+
+                        prompt_parts = []
                         if system_prompt:
-                            prompt = (
-                                f"{system_prompt}\n\n"
-                                f"用户占卜的内容是：{content}，结果是：{result}。"
-                                f"请用{max_chars}字以内给出解释，直接输出解释内容，不要前缀。"
+                            prompt_parts.append(system_prompt)
+                        if search_context:
+                            prompt_parts.append(
+                                f"以下是关于「{content}」的网页搜索背景信息，供你理解其真实含义时参考：\n"
+                                f"{search_context}"
                             )
-                        else:
-                            prompt = (
-                                f"用户占卜的内容是：{content}，结果是：{result}。"
-                                f"请用{max_chars}字以内给出解释，直接输出解释内容，不要前缀。"
-                            )
+                        prompt_parts.append(
+                            f"用户占卜的内容是：{content}，结果是：{result}。"
+                            f"请{'结合上述背景信息，' if search_context else ''}用{max_chars}字以内给出解释，直接输出解释内容，不要前缀。"
+                        )
+                        prompt = "\n\n".join(prompt_parts)
 
                         llm_resp = await self.context.llm_generate(
                             chat_provider_id=provider_id,

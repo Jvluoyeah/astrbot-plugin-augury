@@ -29,5 +29,29 @@
     "type": "string",
     "hint": "当占卜内容触发安全限制时返回的提示信息",
     "default": "抱歉，该占卜内容不符合正向价值观或存在安全风险，无法为您占卜。"
+  },
+  "enable_web_search": {
+    "description": "启用网页搜索辅助解释",
+    "type": "bool",
+    "hint": "开启后在 LLM 解释前先调用 DeepSeek 网页搜索 API 搜索占卜事项的含义",
+    "default": false
+  },
+  "deepseek_api_key": {
+    "description": "DeepSeek API Key",
+    "type": "string",
+    "hint": "用于调用 DeepSeek 网页搜索 API（开启网页搜索时必填）",
+    "default": ""
+  },
+  "deepseek_search_url": {
+    "description": "DeepSeek 网页搜索接口地址",
+    "type": "string",
+    "hint": "默认使用官方端点 https://api.deepseek.com/v1/tools/search",
+    "default": "https://api.deepseek.com/v1/tools/search"
+  },
+  "web_search_count": {
+    "description": "网页搜索结果条数",
+    "type": "int",
+    "hint": "每次调用网页搜索返回的结果数量（1-50），默认 5",
+    "default": 5
   }
 }
