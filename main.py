@@ -21,11 +21,10 @@ class AuguryPlugin(Star):
 
     @filter.command("占卜")
     async def augury(self, event: AstrMessageEvent, *, content: str = None):
-        if not content or not content.strip():
+        content = "" if content is None else str(content).strip()
+        if not content:
             yield event.plain_result("用法: /占卜 <你想占卜的事项>")
             return
-
-        content = content.strip()
         user_id = event.get_sender_id()
         user_name = event.get_sender_name()
         key = self._cache_key(user_id, content)
